@@ -1,0 +1,8 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [],
+  "verifiedAtCommit": "f7bc50ae5b752e50fab7f97ee00531ca1264ea05",
+  "notes": "LibreChat monorepo. Frontend (Vite dev) on port 3000, API backend on port 3080. API keys (OpenAI, Anthropic, etc.) are set to 'user_provided' which lets users enter their own keys in the UI. A placeholder client/dist/index.html is needed because the API tries to read it on startup. The vite.config.ts was patched to support VITE_ALLOWED_HOSTS=true and BACKEND_HOST env var for docker networking."
+}
