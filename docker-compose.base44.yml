@@ -1,0 +1,174 @@
+# Base44 development compose — runs LibreChat from source with hot reload
+services:
+  mongodb:
+    container_name: chat-mongodb
+    image: mongo:8.0.20
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    container_name: chat-meilisearch
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=base44devMeiliMasterKey123456789
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vectordb:
+    container_name: vectordb
+    image: pgvector/pgvector:0.8.0-pg15-trixie
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: install npm dependencies and build packages
+  setup:
+    image: node:24.16.0-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - packages_dp_node_modules:/app/packages/data-provider/node_modules
+      - packages_ds_node_modules:/app/packages/data-schemas/node_modules
+      - packages_api_node_modules:/app/packages/api/node_modules
+      - packages_client_node_modules:/app/packages/client/node_modules
+    command: >
+      sh -c "
+        echo '=== Installing dependencies ===' &&
+        npm ci --no-audit --ignore-scripts 2>&1 | tail -5 &&
+        echo '=== Building packages (turbo) ===' &&
+        npx turbo run build --filter='!@librechat/frontend' --no-daemon 2>&1 | tail -20 &&
+        echo '=== Setup complete ==='
+      "
+
+  api:
+    image: node:24.16.0-alpine
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      vectordb:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=base44devMeiliMasterKey123456789
+      - RAG_PORT=8000
+      - RAG_API_URL=http://rag_api:8000
+      - DOMAIN_CLIENT=http://localhost:3000
+      - DOMAIN_SERVER=http://localhost:3080
+      - ALLOW_REGISTRATION=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - JWT_SECRET=16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef
+      - JWT_REFRESH_SECRET=eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418
+      - DEBUG_LOGGING=true
+      - CONSOLE_JSON=false
+      - OPENAI_API_KEY=user_provided
+      - ANTHROPIC_API_KEY=user_provided
+      - GOOGLE_API_KEY=user_provided
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - packages_dp_node_modules:/app/packages/data-provider/node_modules
+      - packages_ds_node_modules:/app/packages/data-schemas/node_modules
+      - packages_api_node_modules:/app/packages/api/node_modules
+      - packages_client_node_modules:/app/packages/client/node_modules
+    ports:
+      - "3080:3080"
+    command: >
+      sh -c "npx nodemon api/server/index.js"
+
+  rag_api:
+    container_name: rag_api
+    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite:latest
+    restart: unless-stopped
+    depends_on:
+      vectordb:
+        condition: service_healthy
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=8000
+      - POSTGRES_DB=mydatabase
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+
+  frontend:
+    image: node:24.16.0-alpine
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3000
+      - BACKEND_PORT=3080
+      - BACKEND_HOST=api
+      - VITE_ALLOWED_HOSTS=true
+      - DOMAIN_CLIENT=http://localhost:3000
+      - ALLOW_REGISTRATION=true
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - packages_dp_node_modules:/app/packages/data-provider/node_modules
+      - packages_ds_node_modules:/app/packages/data-schemas/node_modules
+      - packages_api_node_modules:/app/packages/api/node_modules
+      - packages_client_node_modules:/app/packages/client/node_modules
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "cd client && npx vite --host 0.0.0.0 --port 3000"
+
+volumes:
+  mongo_data:
+  meili_data:
+  pgdata:
+  node_modules:
+  client_node_modules:
+  api_node_modules:
+  packages_dp_node_modules:
+  packages_ds_node_modules:
+  packages_api_node_modules:
+  packages_client_node_modules:
