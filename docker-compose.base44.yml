@@ -1,0 +1,121 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=base44devmasterkey1234567890abcdef
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24-slim
+    working_dir: /app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - pkg_dp_nm:/app/packages/data-provider/node_modules
+      - pkg_ds_nm:/app/packages/data-schemas/node_modules
+      - pkg_api_nm:/app/packages/api/node_modules
+      - pkg_client_nm:/app/packages/client/node_modules
+    environment:
+      - NODE_ENV=development
+      - NODE_OPTIONS=--max-old-space-size=4096
+    command: >
+      bash -c "
+        set -e &&
+        echo '=== Installing dependencies ===' &&
+        npm install --include=dev 2>&1 | tail -20 &&
+        echo '=== Building packages ===' &&
+        npm run build:packages 2>&1 | tail -20 &&
+        echo '=== Building client ===' &&
+        cd /app/client && npm run build 2>&1 | tail -20 &&
+        echo '=== Setup complete ==='
+      "
+
+  app:
+    image: node:24-slim
+    working_dir: /app
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3090"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - pkg_dp_nm:/app/packages/data-provider/node_modules
+      - pkg_ds_nm:/app/packages/data-schemas/node_modules
+      - pkg_api_nm:/app/packages/api/node_modules
+      - pkg_client_nm:/app/packages/client/node_modules
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3080
+      - BACKEND_HOST=localhost
+      - BACKEND_PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=base44devmasterkey1234567890abcdef
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - JWT_SECRET=16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef
+      - JWT_REFRESH_SECRET=eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418
+      - ALLOW_REGISTRATION=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - DEBUG_LOGGING=true
+      - NO_INDEX=true
+      - VITE_ALLOWED_HOSTS=all
+    env_file:
+      - path: /run/base44/app.env
+        required: false
+    command: >
+      bash -c "
+        echo 'Starting API backend on port 3080...' &&
+        node api/server/index.js &
+        API_PID=$$! &&
+        echo 'Waiting for API to start...' &&
+        sleep 10 &&
+        echo 'Starting Vite dev server on port 3090...' &&
+        cd /app/client && npx vite --host 0.0.0.0 --port 3090
+      "
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  meili_data:
+  node_modules:
+  client_node_modules:
+  api_node_modules:
+  pkg_dp_nm:
+  pkg_ds_nm:
+  pkg_api_nm:
+  pkg_client_nm:
