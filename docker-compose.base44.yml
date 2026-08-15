@@ -1,0 +1,110 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=base44devkey123456
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      sh -c "
+        if [ ! -d node_modules/.package-lock.json ]; then
+          npm install;
+        fi &&
+        npx turbo run build --filter='!@librechat/frontend'
+      "
+    environment:
+      - NODE_ENV=development
+
+  api:
+    image: node:24-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3080:3080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    environment:
+      - NODE_ENV=development
+      - NODE_PATH=/app/node_modules:/app/api/node_modules:/app/packages/data-schemas/node_modules
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=base44devkey123456
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - ALLOW_REGISTRATION=true
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=true
+      - SESSION_EXPIRY=1000 * 60 * 15
+      - REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+      - JWT_SECRET=16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef
+      - JWT_REFRESH_SECRET=eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - OPENAI_API_KEY=user_provided
+      - ANTHROPIC_API_KEY=user_provided
+      - GOOGLE_KEY=user_provided
+      - ASSISTANTS_API_KEY=user_provided
+      - NO_INDEX=true
+      - DEBUG_LOGGING=true
+      - SEARCH=true
+    env_file:
+      - /run/base44/app.env
+    command: npx nodemon api/server/index.js
+    restart: unless-stopped
+
+  client:
+    image: node:24-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3090"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3090
+      - BACKEND_PORT=3080
+      - VITE_ALLOWED_HOSTS=3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    command: sh -c "cd client && npx vite --host 0.0.0.0 --port 3090"
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  meili_data:
