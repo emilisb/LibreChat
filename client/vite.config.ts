@@ -45,8 +45,7 @@ const QUERY_DEVTOOLS_CHUNK_MODULES = [
 export default defineConfig(({ command }) => ({
   base: '',
   server: {
-    allowedHosts:
-      (process.env.VITE_ALLOWED_HOSTS && process.env.VITE_ALLOWED_HOSTS.split(',')) || [],
+    allowedHosts: true,
     host: process.env.HOST || 'localhost',
     port: (process.env.PORT && Number(process.env.PORT)) || 3090,
     strictPort: false,
