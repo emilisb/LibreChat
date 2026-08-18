@@ -1,0 +1,97 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: >
+      bash -c "
+        if [ ! -f /app/node_modules/.install_done ] || [ /app/package-lock.json -nt /app/node_modules/.install_done ]; then
+          echo 'Installing dependencies...' &&
+          npm install --prefer-offline 2>&1 | tail -10 &&
+          touch /app/node_modules/.install_done
+        fi &&
+        echo 'Building packages...' &&
+        npx turbo run build --filter='!@librechat/frontend' 2>&1 | tail -20 &&
+        echo 'Setup complete!'
+      "
+
+  backend:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "3080:3080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - ALLOW_REGISTRATION=true
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - ALLOW_SOCIAL_REGISTRATION=false
+      - SESSION_EXPIRY=1000 * 60 * 15
+      - REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+      - JWT_SECRET=dev_jwt_secret_base44_local_only_not_for_production
+      - JWT_REFRESH_SECRET=dev_jwt_refresh_secret_base44_local_only_not_for_prod
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - MEILI_NO_ANALYTICS=true
+      - OPENAI_API_KEY=user_provided
+      - ANTHROPIC_API_KEY=user_provided
+      - GOOGLE_KEY=user_provided
+      - BAN_VIOLATIONS=false
+      - SEARCH=false
+    command: npx nodemon api/server/index.js
+    restart: unless-stopped
+
+  frontend:
+    image: node:24
+    working_dir: /app/client
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "3000:3090"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3090
+      - VITE_ALLOWED_HOSTS=true
+      - BACKEND_HOST=backend
+      - BACKEND_PORT=3080
+    command: npx vite --host 0.0.0.0 --port 3090
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  node_modules:
