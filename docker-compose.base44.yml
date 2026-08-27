@@ -1,0 +1,150 @@
+services:
+  mongodb:
+    container_name: chat-mongodb
+    image: mongo:8.0
+    restart: always
+    volumes:
+      - mongo-data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    container_name: chat-meilisearch
+    image: getmeili/meilisearch:v1.35.1
+    restart: always
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=DrhYf7zENyR6AlUCKmnz0eYASOQdl6zxH7s7MKFSfFCt
+    volumes:
+      - meili-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vectordb:
+    container_name: vectordb
+    image: pgvector/pgvector:0.8.0-pg15-trixie
+    environment:
+      POSTGRES_DB: mydatabase
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    restart: always
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rag_api:
+    container_name: rag_api
+    image: registry.librechat.ai/danny-avila/librechat-rag-api-dev-lite:latest
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=8000
+      - POSTGRES_DB=mydatabase
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+    restart: always
+    depends_on:
+      vectordb:
+        condition: service_healthy
+
+  setup:
+    container_name: librechat-setup
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      sh -c "npm install --legacy-peer-deps && npm run build:packages"
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=4096
+
+  backend:
+    container_name: librechat-backend
+    image: node:24
+    working_dir: /app
+    ports:
+      - "3080:3080"
+    volumes:
+      - .:/app
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - NODE_ENV=development
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=DrhYf7zENyR6AlUCKmnz0eYASOQdl6zxH7s7MKFSfFCt
+      - RAG_PORT=8000
+      - RAG_API_URL=http://rag_api:8000
+      - NO_INDEX=true
+      - DOMAIN_CLIENT=http://localhost:3080
+      - DOMAIN_SERVER=http://localhost:3080
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_REGISTRATION=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - ALLOW_SOCIAL_REGISTRATION=false
+      - ALLOW_PASSWORD_RESET=false
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=true
+      - SESSION_EXPIRY=1000 * 60 * 15
+      - REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+      - JWT_SECRET=16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef
+      - JWT_REFRESH_SECRET=eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - OPENAI_API_KEY=user_provided
+      - ANTHROPIC_API_KEY=user_provided
+      - GOOGLE_KEY=user_provided
+      - ASSISTANTS_API_KEY=user_provided
+      - BAN_VIOLATIONS=true
+      - SEARCH=true
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - NODE_PATH=/app/api/node_modules
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    command: npx nodemon api/server/index.js
+    restart: unless-stopped
+
+  frontend:
+    container_name: librechat-frontend
+    image: node:24
+    working_dir: /app/client
+    ports:
+      - "3000:3090"
+    volumes:
+      - .:/app
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+    environment:
+      - HOST=backend
+      - PORT=3090
+      - NODE_ENV=development
+      - BACKEND_PORT=3080
+      - VITE_ALLOWED_HOSTS=3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    command: npx vite --host 0.0.0.0 --port 3090
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  meili-data:
+  pgdata:

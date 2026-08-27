@@ -205,5 +205,8 @@
       "admin/",
       "packages/"
     ]
+  },
+  "dependencies": {
+    "react-window": "^2.3.0"
   }
 }
