@@ -1,0 +1,109 @@
+services:
+  mongodb:
+    image: mongo:8.0.20
+    restart: unless-stopped
+    command: mongod --noauth
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    restart: unless-stopped
+    environment:
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=base44devmasterkey123456789
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: node:24.16.0-alpine
+    working_dir: /app
+    ports:
+      - "3000:3090"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - dp_node_modules:/app/packages/data-provider/node_modules
+      - ds_node_modules:/app/packages/data-schemas/node_modules
+      - pa_node_modules:/app/packages/api/node_modules
+      - pc_node_modules:/app/packages/client/node_modules
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=base44devmasterkey123456789
+      - SEARCH=true
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - ALLOW_REGISTRATION=true
+      - ALLOW_EMAIL_LOGIN=true
+      - ALLOW_UNVERIFIED_EMAIL_LOGIN=true
+      - ALLOW_SOCIAL_LOGIN=false
+      - SESSION_EXPIRY=1000 * 60 * 15
+      - REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+      - JWT_SECRET=b44dev_16f8c0ef4a5d391b26034086c628469d3f9f497f
+      - JWT_REFRESH_SECRET=b44dev_eaa5191f2914e30b9387fd84e254e4ba6fc51b46
+      - CREDS_KEY=f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0
+      - CREDS_IV=e2341419ec3dd3d19b13a1a87fafcbfb
+      - DEBUG_LOGGING=true
+      - OPENAI_API_KEY=user_provided
+      - ANTHROPIC_API_KEY=user_provided
+      - GOOGLE_KEY=user_provided
+      - ASSISTANTS_API_KEY=user_provided
+      - NODE_ENV=development
+      - VITE_ALLOWED_HOSTS=.${BASE44_SANDBOX_HOST_DOMAIN}
+      - BACKEND_PORT=3080
+      - SESSION_COOKIE_SECURE=false
+      - NO_INDEX=true
+      - BAN_VIOLATIONS=false
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    command: >
+      sh -c "
+        apk add --no-cache python3 make g++ 2>/dev/null || true
+        npm ci --no-audit 2>&1 | tail -5
+        npm run build 2>&1 | tail -20
+        echo '=== Starting backend ==='
+        node api/server/index.js &
+        BACKEND_PID=$$!
+        echo '=== Waiting for backend on port 3080 ==='
+        for i in $$(seq 1 60); do
+          if wget -q -O /dev/null http://localhost:3080/api/health 2>/dev/null || wget -q -O /dev/null http://localhost:3080/ 2>/dev/null; then
+            echo 'Backend is ready'
+            break
+          fi
+          sleep 2
+        done
+        echo '=== Starting frontend dev server ==='
+        cd client && npx vite --host 0.0.0.0 --port 3090
+      "
+
+volumes:
+  mongo_data:
+  meili_data:
+  node_modules:
+  client_node_modules:
+  api_node_modules:
+  dp_node_modules:
+  ds_node_modules:
+  pa_node_modules:
+  pc_node_modules:
