@@ -1,0 +1,100 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: librechat-mongodb
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    command: mongod --noauth
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    container_name: librechat-meilisearch
+    restart: always
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=base44devmasterkey1234567890abcdef
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24
+    container_name: librechat-setup
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - pkg_dp_nm:/app/packages/data-provider/node_modules
+      - pkg_ds_nm:/app/packages/data-schemas/node_modules
+      - pkg_api_nm:/app/packages/api/node_modules
+      - pkg_client_nm:/app/packages/client/node_modules
+      - turbo_cache:/app/.turbo
+      - client_dist:/app/client/dist
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=4096
+    command: >
+      sh -c "
+        npm install --ignore-scripts 2>&1 | tail -5 &&
+        npx turbo run build 2>&1 | tail -30 &&
+        echo 'SETUP_DONE'
+      "
+
+  api:
+    image: node:24
+    container_name: librechat-api
+    working_dir: /app
+    ports:
+      - "3000:3080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - client_node_modules:/app/client/node_modules
+      - api_node_modules:/app/api/node_modules
+      - pkg_dp_nm:/app/packages/data-provider/node_modules
+      - pkg_ds_nm:/app/packages/data-schemas/node_modules
+      - pkg_api_nm:/app/packages/api/node_modules
+      - pkg_client_nm:/app/packages/client/node_modules
+      - turbo_cache:/app/.turbo
+      - client_dist:/app/client/dist
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    command: npx nodemon api/server/index.js
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+volumes:
+  mongo_data:
+  node_modules:
+  client_node_modules:
+  api_node_modules:
+  pkg_dp_nm:
+  pkg_ds_nm:
+  pkg_api_nm:
+  pkg_client_nm:
+  turbo_cache:
+  client_dist:
