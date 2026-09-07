@@ -1,0 +1,8 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/login",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    {"name": "OPENAI_API_KEY", "description": "Optional: OpenAI key for chat models. Leave unset to let each user provide their own key in the UI.", "requiredAtBoot": false}
+  ]
+}
