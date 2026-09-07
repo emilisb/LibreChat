@@ -30,6 +30,7 @@ services:
       - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
       - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
       - NO_PROXY=localhost,127.0.0.1,mongodb
+      - SEARCH=false
     env_file:
       - /run/base44/app.env
     ports:
