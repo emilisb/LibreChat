@@ -1,0 +1,68 @@
+services:
+  mongodb:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      bash -lc "npm ci --no-audit --no-fund && npm run build:packages &&
+      mkdir -p client/dist &&
+      { [ -f client/dist/index.html ] || echo '<!doctype html><title>LibreChat dev</title>' > client/dist/index.html; }"
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=6144
+
+  api:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file:
+      - ./base44.defaults.env
+      - /run/base44/app.env
+    environment:
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    command: bash -lc "npx nodemon api/server/index.js"
+    ports:
+      - '3080:3080'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+
+  client:
+    image: node:24
+    working_dir: /app/client
+    volumes:
+      - .:/app
+    env_file:
+      - ./base44.defaults.env
+      - /run/base44/app.env
+    environment:
+      - HOST=api
+      - PORT=3090
+      - BACKEND_PORT=3080
+      - VITE_ALLOWED_HOSTS=.${BASE44_SANDBOX_HOST_DOMAIN}
+      - CHOKIDAR_USEPOLLING=true
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    command: bash -lc "npx vite --host 0.0.0.0 --port 3090"
+    ports:
+      - '3000:3090'
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+volumes:
+  mongo-data:

@@ -1,0 +1,9 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/login",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    { "name": "OPENAI_API_KEY", "description": "OpenAI API key (platform.openai.com) — optional; defaults to user_provided", "requiredAtBoot": false },
+    { "name": "ANTHROPIC_API_KEY", "description": "Anthropic API key (console.anthropic.com) — optional; defaults to user_provided", "requiredAtBoot": false }
+  ]
+}
