@@ -52,6 +52,14 @@ module.exports = {
           '25%': { transform: 'translateX(-3px)' },
           '75%': { transform: 'translateX(3px)' },
         },
+        rise: {
+          from: { opacity: 0, transform: 'translateY(16px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+        drift: {
+          from: { transform: 'scale(1)' },
+          to: { transform: 'scale(1.055)' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out forwards',
@@ -62,6 +70,8 @@ module.exports = {
         'slide-out-left': 'slide-out-left 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
         'slide-out-right': 'slide-out-right 300ms cubic-bezier(0.25, 0.1, 0.25, 1)',
         'shortcut-shake': 'shortcut-shake 0.25s ease-in-out',
+        rise: 'rise 0.65s ease-out both',
+        drift: 'drift 18s ease-in-out infinite alternate',
       },
       colors: {
         gray: {

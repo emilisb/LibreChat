@@ -32,12 +32,11 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
   const validTheme = isDark(theme) ? 'dark' : 'light';
   const requireCaptcha = Boolean(startupConfig.turnstile?.siteKey);
   const authInputClassName =
-    'webkit-dark-styles transition-color peer w-full rounded-2xl border border-border-light bg-surface-primary px-3.5 pb-2.5 pt-3 text-text-primary duration-200 hover:border-border-light focus:border-green-500 focus:outline-none focus-visible:border-green-500';
-  const authSecretInputClassName = `${authInputClassName} h-auto pr-12`;
+    'peer h-[58px] w-full rounded-none border-0 border-b border-[#C9C5BC] bg-transparent px-0 pb-[7px] pt-[21px] text-[15px] text-[#1B1B18] outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-transparent focus:border-[#4B6A55] focus:shadow-[0_1px_0_#4B6A55]';
+  const authSecretInputClassName = `${authInputClassName} pr-12`;
   const authLabelClassName =
-    'absolute start-3 top-1.5 z-10 origin-[0] -translate-y-4 scale-75 transform bg-surface-primary px-2 text-sm text-text-secondary-alt duration-200 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:scale-100 peer-focus:top-1.5 peer-focus:-translate-y-4 peer-focus:scale-75 peer-focus:px-2 peer-focus:text-green-600 dark:peer-focus:text-green-500 rtl:peer-focus:left-auto rtl:peer-focus:translate-x-1/4';
-  const authSecretButtonClassName =
-    'size-9 rounded-xl text-text-secondary-alt hover:bg-transparent hover:text-text-primary';
+    'absolute left-0 top-[19px] text-[11px] uppercase tracking-[1.8px] text-[#77756E] pointer-events-none transition-transform duration-200 peer-focus:-translate-y-[15px] peer-focus:text-[#4B6A55] peer-[&:not(:placeholder-shown)]:-translate-y-[15px] peer-[&:not(:placeholder-shown)]:text-[#4B6A55]';
+  const authSecretButtonClassName = 'size-9 text-[#77756E] hover:bg-transparent hover:text-[#1B1B18]';
 
   useEffect(() => {
     if (error && error.includes('422') && !showResendLink) {
@@ -89,12 +88,12 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
         </div>
       )}
       <form
-        className="mt-6"
+        className="mt-6 flex flex-col gap-[25px]"
         aria-label="Login form"
         method="POST"
         onSubmit={handleSubmit((data) => onSubmit(data))}
       >
-        <div className="mb-4">
+        <div className="relative animate-rise" style={{ animationDelay: '0.18s' }}>
           <div className="relative">
             <input
               type="text"
@@ -120,7 +119,7 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
           </div>
           {renderError('email')}
         </div>
-        <div className="mb-2">
+        <div className="relative animate-rise" style={{ animationDelay: '0.28s' }}>
           <div className="relative">
             <SecretInput
               id="password"
@@ -148,7 +147,8 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
         {startupConfig.passwordResetEnabled && (
           <a
             href="/forgot-password"
-            className="inline-flex p-1 text-sm font-medium text-green-600 underline decoration-transparent transition-all duration-200 hover:text-green-700 hover:decoration-green-700 focus:text-green-700 focus:decoration-green-700 dark:text-green-500 dark:hover:text-green-400 dark:hover:decoration-green-400 dark:focus:text-green-400 dark:focus:decoration-green-400"
+            className="-mt-2 animate-rise self-end border-b border-transparent text-[13px] text-[#4B6A55] no-underline transition-colors duration-200 hover:border-[#4B6A55] hover:text-[#1B1B18] focus-visible:border-[#4B6A55] focus-visible:text-[#1B1B18]"
+            style={{ animationDelay: '0.36s' }}
           >
             {localize('com_auth_password_forgot')}
           </a>
@@ -169,14 +169,14 @@ const LoginForm: React.FC<TLoginFormProps> = ({ onSubmit, startupConfig, error, 
           </div>
         )}
 
-        <div className="mt-6">
+        <div className="mt-0.5 animate-rise" style={{ animationDelay: '0.44s' }}>
           <Button
             aria-label={localize('com_auth_continue')}
             data-testid="login-button"
             type="submit"
             disabled={(requireCaptcha && !turnstileToken) || isSubmitting}
             variant="submit"
-            className="h-12 w-full rounded-2xl"
+            className="h-[54px] w-full rounded-none border border-[#4B6A55] bg-[#4B6A55] text-[14px] tracking-[0.6px] text-[#FFFDF8] transition-[background-color,box-shadow] duration-200 hover:bg-[#385441] hover:shadow-[0_7px_18px_#4b6a5530] active:bg-[#294333] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1B1B18] focus-visible:outline-offset-[3px]"
           >
             {isSubmitting ? <Spinner /> : localize('com_auth_continue')}
           </Button>

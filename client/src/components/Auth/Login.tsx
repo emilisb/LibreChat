@@ -110,12 +110,15 @@ function Login() {
         />
       )}
       {startupConfig?.registrationEnabled === true && (
-        <p className="my-4 text-center text-sm font-light text-gray-700 dark:text-white">
+        <p
+          className="mt-5 animate-rise text-center text-[13px] text-[#77756E]"
+          style={{ animationDelay: '0.52s' }}
+        >
           {' '}
           {localize('com_auth_no_account')}{' '}
           <a
             href={registerPage()}
-            className="inline-flex p-1 text-sm font-medium text-green-600 underline decoration-transparent transition-all duration-200 hover:text-green-700 hover:decoration-green-700 focus:text-green-700 focus:decoration-green-700 dark:text-green-500 dark:hover:text-green-400 dark:hover:decoration-green-400 dark:focus:text-green-400 dark:focus:decoration-green-400"
+            className="border-b border-[#4B6A55] font-bold text-[#4B6A55] no-underline transition-colors duration-200 hover:border-[#1B1B18] hover:text-[#1B1B18] focus-visible:border-[#1B1B18] focus-visible:text-[#1B1B18]"
           >
             {localize('com_auth_sign_up')}
           </a>

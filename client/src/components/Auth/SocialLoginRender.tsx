@@ -16,8 +16,20 @@ import { TStartupConfig } from 'librechat-data-provider';
 
 function SocialLoginRender({
   startupConfig,
+  containerClassName,
+  containerStyle,
+  dividerClassName,
+  dividerLabelClassName,
+  buttonWrapperClassName,
+  buttonClassName,
 }: {
   startupConfig: TStartupConfig | null | undefined;
+  containerClassName?: string;
+  containerStyle?: React.CSSProperties;
+  dividerClassName?: string;
+  dividerLabelClassName?: string;
+  buttonWrapperClassName?: string;
+  buttonClassName?: string;
 }) {
   const localize = useLocalize();
 
@@ -35,6 +47,8 @@ function SocialLoginRender({
         Icon={DiscordIcon}
         label={localize('com_auth_discord_login')}
         id="discord"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     facebook: startupConfig.facebookLoginEnabled && (
@@ -46,6 +60,8 @@ function SocialLoginRender({
         Icon={FacebookIcon}
         label={localize('com_auth_facebook_login')}
         id="facebook"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     github: startupConfig.githubLoginEnabled && (
@@ -57,6 +73,8 @@ function SocialLoginRender({
         Icon={GithubIcon}
         label={localize('com_auth_github_login')}
         id="github"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     google: startupConfig.googleLoginEnabled && (
@@ -68,6 +86,8 @@ function SocialLoginRender({
         Icon={GoogleIcon}
         label={localize('com_auth_google_login')}
         id="google"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     apple: startupConfig.appleLoginEnabled && (
@@ -79,6 +99,8 @@ function SocialLoginRender({
         Icon={AppleIcon}
         label={localize('com_auth_apple_login')}
         id="apple"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     openid: startupConfig.openidLoginEnabled && (
@@ -96,6 +118,8 @@ function SocialLoginRender({
         }
         label={startupConfig.openidLabel}
         id="openid"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
     saml: startupConfig.samlLoginEnabled && (
@@ -113,27 +137,37 @@ function SocialLoginRender({
         }
         label={startupConfig.samlLabel ? startupConfig.samlLabel : localize('com_auth_saml_login')}
         id="saml"
+        wrapperClassName={buttonWrapperClassName}
+        className={buttonClassName}
       />
     ),
   };
 
   return (
     startupConfig.socialLoginEnabled && (
-      <>
+      <div className={containerClassName} style={containerStyle}>
         {startupConfig.emailLoginEnabled && (
           <>
-            <div className="relative mt-6 flex w-full items-center justify-center border border-t border-gray-300 uppercase dark:border-gray-600">
-              <div className="absolute bg-white px-3 text-xs text-black dark:bg-gray-900 dark:text-white">
-                Or
+            {dividerClassName ? (
+              <div className={dividerClassName}>
+                <span className={dividerLabelClassName}>Or</span>
               </div>
-            </div>
-            <div className="mt-8" />
+            ) : (
+              <>
+                <div className="relative mt-6 flex w-full items-center justify-center border border-t border-gray-300 uppercase dark:border-gray-600">
+                  <div className="absolute bg-white px-3 text-xs text-black dark:bg-gray-900 dark:text-white">
+                    Or
+                  </div>
+                </div>
+                <div className="mt-8" />
+              </>
+            )}
           </>
         )}
-        <div className="mt-2">
+        <div className={dividerClassName ? undefined : 'mt-2'}>
           {startupConfig.socialLogins?.map((provider) => providerComponents[provider] || null)}
         </div>
-      </>
+      </div>
     )
   );
 }

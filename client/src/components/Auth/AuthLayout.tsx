@@ -2,6 +2,7 @@ import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
 import { TranslationKeys, useLocalize } from '~/hooks';
+import SplitCanvasAuthLayout from './SplitCanvasAuthLayout';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
 import { Banner } from '../Banners';
@@ -55,6 +56,14 @@ function AuthLayout({
     }
     return null;
   };
+
+  if (pathname === '/login') {
+    return (
+      <SplitCanvasAuthLayout header={header} startupConfig={startupConfig} displayError={<DisplayError />}>
+        {children}
+      </SplitCanvasAuthLayout>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col bg-white dark:bg-gray-900">
