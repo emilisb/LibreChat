@@ -1,0 +1,10 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    { "name": "JWT_SECRET", "description": "Auth token signing secret", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "JWT_REFRESH_SECRET", "description": "Refresh token signing secret", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "OPENAI_API_KEY", "description": "OpenAI API key from platform.openai.com/api-keys — needed to actually chat with a model", "requiredAtBoot": false }
+  ]
+}

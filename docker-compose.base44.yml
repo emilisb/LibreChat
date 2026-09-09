@@ -1,0 +1,67 @@
+services:
+  mongodb:
+    image: mongo:8.0.20
+    command: mongod --noauth
+    restart: unless-stopped
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.adminCommand("ping")']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  setup:
+    image: node:24
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: >
+      bash -lc "npm install --no-audit --no-fund && npm run build:packages &&
+      mkdir -p client/dist && [ -f client/dist/index.html ] ||
+      echo '<!doctype html><title>LibreChat API (dev)</title>' > client/dist/index.html"
+
+  api:
+    image: node:24
+    working_dir: /app
+    command: bash -lc "npx nodemon api/server/index.js"
+    env_file:
+      - ./.env.base44-defaults
+      - /run/base44/app.env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    volumes:
+      - .:/app
+    ports:
+      - '3080:3080'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+
+  client:
+    image: node:24
+    working_dir: /app/client
+    command: bash -lc "npm run dev -- --host 0.0.0.0 --port 3000"
+    env_file:
+      - ./.env.base44-defaults
+    environment:
+      - HOST=api
+      - BACKEND_PORT=3080
+      - CHOKIDAR_USEPOLLING=true
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=${__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS:-.${BASE44_SANDBOX_HOST_DOMAIN}}
+    volumes:
+      - .:/app
+    ports:
+      - '3000:3000'
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+volumes:
+  mongodata:
