@@ -1,0 +1,79 @@
+name: librechat-base44
+
+x-node: &node
+  image: node:24
+  working_dir: /app
+  volumes:
+    - ./:/app
+  env_file:
+    - ./.base44/defaults.env
+    - /run/base44/app.env
+
+services:
+  mongodb:
+    image: mongo:8
+    command: mongod --noauth
+    volumes:
+      - mongo-data:/data/db
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: install deps and build the internal workspace packages the API/client import.
+  # The API refuses to start without client/dist/index.html (prod SPA fallback); in dev Vite
+  # serves the UI, so seed it from the source template instead of a full client build.
+  setup:
+    <<: *node
+    command: sh -c "npm ci --no-audit --no-fund && npm run build:packages && mkdir -p client/dist && { [ -f client/dist/index.html ] || cp client/index.html client/dist/index.html; }"
+
+  api:
+    <<: *node
+    command: sh .base44/api-entrypoint.sh npx nodemon --legacy-watch api/server/index.js
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - DOMAIN_CLIENT=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+      - DOMAIN_SERVER=https://3000-${BASE44_PUBLIC_HOST_SUFFIX}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:3080/api/config"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+
+  client:
+    <<: *node
+    working_dir: /app/client
+    command: npx vite --host 0.0.0.0 --port 3090
+    environment:
+      - NODE_ENV=development
+      - HOST=api
+      - BACKEND_PORT=3080
+      - CHOKIDAR_USEPOLLING=true
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    ports:
+      - "3000:3090"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost:3090/ || { echo 'vite dev server down'; exit 1; }"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+volumes:
+  mongo-data:

@@ -1,0 +1,14 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d",
+  "secrets": [
+    { "name": "CREDS_KEY", "description": "Key for encrypting stored credentials (64 hex chars; non-hex values are hashed to hex by .base44/api-entrypoint.sh)", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "CREDS_IV", "description": "IV for encrypting stored credentials (32 hex chars; non-hex values are hashed to hex by .base44/api-entrypoint.sh)", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "JWT_SECRET", "description": "Signing secret for access tokens", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "JWT_REFRESH_SECRET", "description": "Signing secret for refresh tokens", "requiredAtBoot": true, "generatedForDevelopment": true },
+    { "name": "OPENAI_API_KEY", "description": "OpenAI API key (platform.openai.com/api-keys); defaults to user_provided", "requiredAtBoot": false },
+    { "name": "ANTHROPIC_API_KEY", "description": "Anthropic API key (console.anthropic.com); defaults to user_provided", "requiredAtBoot": false },
+    { "name": "GOOGLE_KEY", "description": "Google Gemini API key (aistudio.google.com/apikey); defaults to user_provided", "requiredAtBoot": false }
+  ]
+}
